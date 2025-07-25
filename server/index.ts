@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import helmet from "helmet"; // If types missing: npm i -D @types/helmet
 import cors from "cors"; // If types missing: npm i -D @types/cors

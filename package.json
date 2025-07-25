@@ -13,6 +13,7 @@
   "repository": {},
   "license": "UNLICENSED",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.850.0",
     "@remotion/bundler": "^4.0.0",
     "@remotion/cli": "^4.0.0",
     "@remotion/renderer": "^4.0.0",
@@ -20,11 +21,14 @@
     "@types/cors": "^2.8.19",
     "@types/helmet": "^0.0.48",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
     "express": "5.1.0",
     "helmet": "^8.1.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "remotion": "^4.0.0",
+    "winston": "^3.17.0",
+    "winston-cloudwatch": "^6.3.0",
     "zod": "3.22.3"
   },
   "devDependencies": {

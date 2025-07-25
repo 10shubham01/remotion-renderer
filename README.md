@@ -1,83 +1,118 @@
-# Remotion Render Server Template
+# API Usage
 
-<p align="center">
-  <a href="https://github.com/remotion-dev/logo">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/remotion-dev/logo/raw/main/animated-logo-banner-dark.gif">
-      <img alt="Animated Remotion Logo" src="https://github.com/remotion-dev/logo/raw/main/animated-logo-banner-light.gif">
-    </picture>
-  </a>
-</p>
+### 1. Create a Render Job
 
-This template provides an Express.js server that allows you to start new video render jobs, track the progress of ongoing renders, and cancel running render jobs.
+**POST** `/renders`
 
-The server exposes the following main endpoints:
+Start a new render job.
 
-- `POST /render` - Start a new render job
-- `GET /renders/:id` - Get the status of a render
-- `DELETE /renders/:id` - Cancel a running render
-
-## Getting Started
-
-**Install Dependencies**
-
-```console
-npm install
+**Request Body:**
+```json
+{
+  "titleText": "Hello, world!",         // (string, optional, default: "Hello, world!")
+  "compositionId": "HelloWorld",        // (string, required)
+  "serveUrl": "http://localhost:3000"   // (string, required)
+}
 ```
 
-**Start the Render Server**
-
-```console
-npm run dev
+**Example:**
+```bash
+curl -X POST http://localhost:8989/renders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "titleText": "Hello, world!",
+    "compositionId": "HelloWorld",
+    "serveUrl": "http://localhost:3000"
+  }'
 ```
 
-This will start the Express server that handles render requests in watch mode for development.
-
-**Run in Production**
-
-```console
-npm start
+**Response:**
+```json
+{
+  "jobId": "<job-id>"
+}
 ```
 
-**Run Remotion Studio**
+---
 
-```console
-npm run remotion:studio
+### 2. Get Render Job Status
+
+**GET** `/renders/:jobId`
+
+Get the status and details of a render job.
+
+**Example:**
+```bash
+curl http://localhost:8989/renders/<job-id>
 ```
 
-**Render the example video locally**
-
-```
-npx remotion render
-```
-
-**Upgrade all Remotion packages:**
-
-```
-npx remotion upgrade
+**Response:**
+```json
+{
+  "status": "queued" | "in-progress" | "completed" | "failed",
+  // ...other job details
+}
 ```
 
-## Docker Support
+---
 
-The template includes Docker support out of the box. Build and run the container using:
+### 3. Cancel a Render Job
 
-```console
-docker build -t remotion-render-server .
-docker run -d -p 3000:3000 remotion-render-server
+**DELETE** `/renders/:jobId`
+
+Cancel a running or queued render job.
+
+**Example:**
+```bash
+curl -X DELETE http://localhost:8989/renders/<job-id>
 ```
 
-## Docs
+**Response:**
+```json
+{
+  "message": "Job cancelled"
+}
+```
 
-Get started with Remotion by reading the [fundamentals page](https://www.remotion.dev/docs/the-fundamentals).
+---
 
-## Help
+### 4. View Server Logs
 
-We provide help on our [Discord server](https://discord.gg/6VzzNDwUwV).
+**GET** `/logs`
 
-## Issues
+Get recent server logs (in-memory, last 200 entries).
 
-Found an issue with Remotion? [File an issue here](https://github.com/remotion-dev/remotion/issues/new).
+**Example:**
+```bash
+curl http://localhost:8989/logs
+```
 
-## License
+**Response:**
+```json
+{
+  "logs": [
+    "[2024-06-07T12:00:00.000Z] ...",
+    // ...
+  ]
+}
+```
 
-Note that for some entities a company license is needed. [Read the terms here](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md).
+---
+
+### 5. Health Check
+
+**GET** `/health`
+
+Check if the server is running.
+
+**Example:**
+```bash
+curl http://localhost:8989/health
+```
+
+**Response:**
+```json
+{
+  "status": "ok"
+}
+```
