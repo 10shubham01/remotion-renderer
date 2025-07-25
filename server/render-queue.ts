@@ -1,14 +1,12 @@
-import {
-  makeCancelSignal,
-  renderMedia,
-  selectComposition,
-} from "@remotion/renderer";
+import { makeCancelSignal, renderMedia, selectComposition } from "@remotion/renderer";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import fs from "fs";
 import winston from "winston";
 import WinstonCloudWatch from "winston-cloudwatch";
+import { webhookLogUrls } from "./index";
+import fetch from "node-fetch";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import fs from "fs";
 
 interface JobData {
   titleText: string;
@@ -45,11 +43,9 @@ type JobState =
       data: JobData;
     };
 
-// Winston logger setup
 const cloudWatchConfig = {
   logGroupName: process.env.CLOUDWATCH_LOG_GROUP || "remotion-render-server-logs",
   logStreamName: process.env.CLOUDWATCH_LOG_STREAM || "default-stream",
-  // AWS SDK will use AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION automatically
 };
 
 const logger = winston.createLogger({
@@ -59,21 +55,30 @@ const logger = winston.createLogger({
   ],
 });
 
-// Print loaded AWS envs for debug (do not print secret)
 console.log('AWS_ACCESS_KEY_ID:', process.env.AWS_ACCESS_KEY_ID);
 console.log('AWS_REGION:', process.env.AWS_REGION);
 
-// Centralized in-memory log buffer
 const logs: string[] = [];
+function postToWebhooks(logEntry: string) {
+  for (const url of webhookLogUrls) {
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ log: logEntry }),
+    }).catch(() => {});
+  }
+}
 function log(message: string) {
   const entry = `[${new Date().toISOString()}] ${message}`;
   logs.push(entry);
   logger.info(message);
+  postToWebhooks(entry);
 }
 function logError(message: string) {
   const entry = `[${new Date().toISOString()}] ERROR: ${message}`;
   logs.push(entry);
   logger.error(message);
+  postToWebhooks(entry);
 }
 export function getLogs() {
   return logs.slice();
@@ -88,38 +93,30 @@ export const makeRenderQueue = ({
 }) => {
   const jobs = new Map<string, JobState>();
   let queue: Promise<unknown> = Promise.resolve();
-
-  // S3 config from env
   const S3_BUCKET = process.env.S3_BUCKET;
   const S3_REQUIRED = process.env.S3_REQUIRED === "true";
   const s3 = S3_BUCKET ? new S3Client({}) : null;
-
   const processRender = async (jobId: string) => {
     const job = jobs.get(jobId);
     if (!job) {
       throw new Error(`Render job ${jobId} not found`);
     }
-
     const { cancel, cancelSignal } = makeCancelSignal();
-
     jobs.set(jobId, {
       progress: 0,
       status: "in-progress",
       cancel: cancel,
       data: job.data,
     });
-
     try {
       const inputProps = {
         titleText: job.data.titleText,
       };
-
       const composition = await selectComposition({
         serveUrl: job.data.serveUrl,
         id: job.data.compositionId,
         inputProps,
       });
-
       const outputPath = path.join(rendersDir, `${jobId}.mp4`);
       await renderMedia({
         cancelSignal,
@@ -138,7 +135,6 @@ export const makeRenderQueue = ({
         },
         outputLocation: outputPath,
       });
-
       let videoUrl = `http://localhost:${port}/renders/${jobId}.mp4`;
       let s3Upload: undefined | { attempted: boolean; success: boolean; url?: string; error?: string } = undefined;
       if (s3 && S3_BUCKET) {
@@ -164,7 +160,6 @@ export const makeRenderQueue = ({
           }
         }
       } else {
-        // Check which envs are missing
         const missingEnvs = [];
         if (!S3_BUCKET) missingEnvs.push('S3_BUCKET');
         if (!process.env.AWS_REGION) missingEnvs.push('AWS_REGION');
@@ -192,7 +187,6 @@ export const makeRenderQueue = ({
       });
     }
   };
-
   const queueRender = async ({
     jobId,
     data,
@@ -208,17 +202,14 @@ export const makeRenderQueue = ({
         log(`${jobId} render cancelled.`);
       },
     });
-
     queue = queue.then(() => processRender(jobId));
     log(`${jobId} render queued.`);
   };
-
   function createJob(data: JobData) {
     const jobId = randomUUID();
     queueRender({ jobId, data });
     return jobId;
   }
-
   return {
     createJob,
     jobs,
